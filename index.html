@@ -1,62 +1,294 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Live Market Ticker</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #131722;   /* matches TradingView dark theme; change if your slide is light */
-      overflow: hidden;      /* no scrollbars inside the slide */
-    }
-    .tradingview-widget-container { width: 100%; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Market Ticker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #131722;
+    --name: #eef0f4;
+    --price: #d1d4dc;
+    --muted: #787b86;
+    --warn: #f5a623;
+    --divider: #2a2e39;
+    --up: #22ab94;
+    --down: #f23645;
+  }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  body {
+    display: flex;
+    align-items: center;
+    font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .viewport { width: 100%; overflow: hidden; }
+  .track { display: flex; width: max-content; animation: scroll var(--duration, 60s) linear infinite; }
+  .group { display: flex; }
+  @keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+  .item {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 0 28px; border-right: 1px solid var(--divider);
+    font-size: 20px; white-space: nowrap;
+  }
+  .name  { color: var(--name); font-weight: 600; }
+  .price { color: var(--price); font-weight: 600; transition: color 0.6s ease; }
+  .price.status { color: var(--warn); font-weight: 500; font-size: 14px; }
+  .price.tick-up   { color: var(--up); transition: none; }
+  .price.tick-down { color: var(--down); transition: none; }
+  .chg { display: inline-flex; align-items: baseline; gap: 4px; font-weight: 600; font-size: 17px; color: var(--muted); }
+  .chg.up { color: var(--up); }
+  .chg.down { color: var(--down); }
+  .arrow { font-size: 12px; position: relative; top: -1px; }
+</style>
 </head>
 <body>
 
-<!--
-  HOW TO EDIT YOUR SYMBOLS
-  ------------------------
-  Each line below is one item on the ticker:
-      { "proName": "EXCHANGE:SYMBOL", "title": "Label shown on screen" }
+<div class="viewport"><div class="track" id="track"></div></div>
 
-  Indian stocks:  NSE:RELIANCE   NSE:TCS   NSE:HDFCBANK   (or BSE:RELIANCE if NSE doesn't load)
-  Indian index:   NSE:NIFTY      BSE:SENSEX
-  Forex:          FX_IDC:USDINR  FX:EURUSD  FX:GBPUSD
-  Crypto:         BINANCE:BTCUSDT  BINANCE:ETHUSDT
-  Commodities:    TVC:GOLD       TVC:USOIL
+<script>
+/* =====================================================================
+   STEP 1 — Paste your Google Sheet link between the quotes.
+   Either link works:
+     • the normal link from your browser's address bar (the sheet must be
+       shared as "Anyone with the link → Viewer"), or
+     • a "Publish to web" link.
+   ===================================================================== */
+const SHEET_LINK = "https://docs.google.com/spreadsheets/d/1Cfq3mWETD_6BNJH_w63gSfkVtQjArUSPRCifnIOiYqE/edit?usp=sharing";
 
-  Find the exact code for anything by searching it on tradingview.com —
-  the code is shown at the top of the chart (e.g. NSE:INFY).
-  Every line except the last one must end with a comma.
--->
+/* =====================================================================
+   STEP 2 — Ticker items, in scrolling order.
+   source "sheet"  → code must match column A of your sheet exactly.
+   source "crypto" → code is the Binance pair; gecko is the CoinGecko id
+                     (used automatically as a backup).
+   ===================================================================== */
+const ITEMS = [
+  { label: "Nifty 50",  source: "sheet",  code: "INDEXNSE:NIFTY_50", prefix: "",  decimals: 2 },
+  { label: "Sensex",    source: "sheet",  code: "INDEXBOM:SENSEX",   prefix: "",  decimals: 2 },
+  { label: "Reliance",  source: "sheet",  code: "NSE:RELIANCE",      prefix: "₹", decimals: 2 },
+  { label: "TCS",       source: "sheet",  code: "NSE:TCS",           prefix: "₹", decimals: 2 },
+  { label: "HDFC Bank", source: "sheet",  code: "NSE:HDFCBANK",      prefix: "₹", decimals: 2 },
+  { label: "Infosys",   source: "sheet",  code: "NSE:INFY",          prefix: "₹", decimals: 2 },
+  { label: "USD/INR",   source: "sheet",  code: "CURRENCY:USDINR",   prefix: "₹", decimals: 4 },
+  { label: "EUR/USD",   source: "sheet",  code: "CURRENCY:EURUSD",   prefix: "$", decimals: 4 },
+  { label: "Bitcoin",   source: "crypto", code: "BTCUSDT", gecko: "bitcoin",  prefix: "$", decimals: 2 },
+  { label: "Ethereum",  source: "crypto", code: "ETHUSDT", gecko: "ethereum", prefix: "$", decimals: 2 }
+];
 
-<div class="tradingview-widget-container">
-  <div class="tradingview-widget-container__widget"></div>
-  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
-  {
-    "symbols": [
-      { "proName": "NSE:NIFTY",       "title": "Nifty 50" },
-      { "proName": "BSE:SENSEX",      "title": "Sensex" },
-      { "proName": "BSE:RELIANCE",    "title": "Reliance" },
-      { "proName": "NSE:TCS",         "title": "TCS" },
-      { "proName": "NSE:HDFCBANK",    "title": "HDFC Bank" },
-      { "proName": "NSE:INFY",        "title": "Infosys" },
-      { "proName": "FX_IDC:USDINR",   "title": "USD/INR" },
-      { "proName": "FX:EURUSD",       "title": "EUR/USD" },
-      { "proName": "BINANCE:BTCUSDT", "title": "Bitcoin" },
-      { "proName": "BINANCE:ETHUSDT", "title": "Ethereum" }
-    ],
-    "showSymbolLogo": true,
-    "isTransparent": false,
-    "displayMode": "adaptive",
-    "colorTheme": "dark",
-    "locale": "en"
+const SHEET_REFRESH_SECONDS = 20;
+const SCROLL_SPEED = 70; // pixels per second
+
+/* ---------------- Nothing below needs editing ---------------- */
+
+const norm = s => String(s || "").trim().toUpperCase();
+const nodesByCode = {};
+const lastPrice = {};
+const hasData = {};
+
+function makeItem(item) {
+  const el = document.createElement("div");
+  el.className = "item";
+  el.innerHTML = '<span class="name"></span><span class="price status">loading…</span>' +
+                 '<span class="chg"><span class="arrow"></span><span class="pct"></span></span>';
+  el.querySelector(".name").textContent = item.label;
+  const code = norm(item.code);
+  (nodesByCode[code] = nodesByCode[code] || []).push(el);
+  return el;
+}
+
+function buildTicker() {
+  const track = document.getElementById("track");
+  const screenWidth = window.innerWidth || 1200;
+  const groupA = document.createElement("div");
+  groupA.className = "group";
+  track.appendChild(groupA);
+  let copies = 0;
+  do { ITEMS.forEach(i => groupA.appendChild(makeItem(i))); copies++; }
+  while (groupA.scrollWidth < screenWidth && copies < 10);
+  const groupB = document.createElement("div");
+  groupB.className = "group";
+  groupB.setAttribute("aria-hidden", "true");
+  for (let c = 0; c < copies; c++) ITEMS.forEach(i => groupB.appendChild(makeItem(i)));
+  track.appendChild(groupB);
+  setDuration();
+}
+
+function setDuration() {
+  const track = document.getElementById("track");
+  const group = track.querySelector(".group");
+  if (group && group.scrollWidth) track.style.setProperty("--duration", (group.scrollWidth / SCROLL_SPEED) + "s");
+}
+
+function itemFor(code) { return ITEMS.find(i => norm(i.code) === norm(code)); }
+
+function showStatus(code, message) {
+  code = norm(code);
+  if (hasData[code]) return;              // never replace a real price with a message
+  (nodesByCode[code] || []).forEach(el => {
+    const p = el.querySelector(".price");
+    p.className = "price status";
+    p.textContent = message;
+  });
+}
+
+function render(code, price, changePct) {
+  code = norm(code);
+  const item = itemFor(code);
+  if (!item || !Number.isFinite(price)) return false;
+  hasData[code] = true;
+
+  const prev = lastPrice[code];
+  const tick = Number.isFinite(prev) && price !== prev ? (price > prev ? "tick-up" : "tick-down") : "";
+  lastPrice[code] = price;
+
+  const locale = item.prefix === "$" ? "en-US" : "en-IN";
+  const text = item.prefix + price.toLocaleString(locale,
+    { minimumFractionDigits: item.decimals, maximumFractionDigits: item.decimals });
+
+  (nodesByCode[code] || []).forEach(el => {
+    const p = el.querySelector(".price");
+    p.className = "price";
+    p.textContent = text;
+    if (tick) { void p.offsetWidth; p.classList.add(tick); setTimeout(() => p.classList.remove(tick), 700); }
+
+    const chg = el.querySelector(".chg");
+    chg.classList.remove("up", "down");
+    if (Number.isFinite(changePct)) {
+      const dir = changePct > 0 ? "up" : changePct < 0 ? "down" : "";
+      if (dir) chg.classList.add(dir);
+      chg.querySelector(".arrow").textContent = dir === "up" ? "▲" : dir === "down" ? "▼" : "";
+      chg.querySelector(".pct").textContent = (changePct > 0 ? "+" : "") + changePct.toFixed(2) + "%";
+    } else {
+      chg.querySelector(".arrow").textContent = "";
+      chg.querySelector(".pct").textContent = "";
+    }
+  });
+  return true;
+}
+
+/* ---------- Google Sheet ---------- */
+
+function sheetCsvUrl(link) {
+  link = String(link || "").trim();
+  if (!link || link.startsWith("PASTE_")) return null;
+  // "Publish to web" link
+  if (link.includes("/spreadsheets/d/e/")) {
+    let base = link.split("#")[0].replace(/\/pubhtml.*$/, "/pub").replace(/\/pub\?.*$/, "/pub");
+    const gid = (link.match(/[?&#]gid=(\d+)/) || [])[1];
+    return base + "?output=csv" + (gid ? "&gid=" + gid + "&single=true" : "");
   }
-  </script>
-</div>
+  // Normal sheet link
+  const id = (link.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/) || [])[1];
+  if (!id) return "INVALID";
+  const gid = (link.match(/[#&?]gid=(\d+)/) || [])[1];
+  return "https://docs.google.com/spreadsheets/d/" + id + "/gviz/tq?tqx=out:csv&headers=1" + (gid ? "&gid=" + gid : "");
+}
 
+function parseCSV(text) {
+  const rows = []; let row = [], field = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') q = false;
+      else field += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); rows.push(row); row = []; field = "";
+    } else field += c;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function toNumber(s) {
+  const t = String(s || "").replace(/[−–]/g, "-").replace(/[^0-9.\-]/g, "");
+  return (t === "" || t === "-" || t === ".") ? NaN : parseFloat(t);
+}
+
+const sheetItems = ITEMS.filter(i => i.source === "sheet");
+
+async function loadSheet() {
+  const url = sheetCsvUrl(SHEET_LINK);
+  if (url === null)      { sheetItems.forEach(i => showStatus(i.code, "add sheet link")); return; }
+  if (url === "INVALID") { sheetItems.forEach(i => showStatus(i.code, "sheet link not recognised")); return; }
+  try {
+    const res = await fetch(url + "&cb=" + Date.now(), { cache: "no-store" });
+    const text = await res.text();
+    if (!res.ok || /^\s*<(!doctype|html)/i.test(text)) throw new Error("not shared");
+    const found = {};
+    parseCSV(text).forEach(r => {
+      const code = norm(r[0]);
+      if (!itemFor(code)) return;
+      found[code] = true;
+      if (!render(code, toNumber(r[1]), toNumber(r[2]))) showStatus(code, "no price in sheet");
+    });
+    sheetItems.forEach(i => { if (!found[norm(i.code)]) showStatus(i.code, "not in sheet"); });
+  } catch (err) {
+    console.warn("Sheet error:", err);
+    sheetItems.forEach(i => showStatus(i.code, "can't open sheet – check sharing"));
+  }
+}
+
+/* ---------- Crypto: Binance live, CoinGecko backup ---------- */
+
+const cryptoItems = ITEMS.filter(i => i.source === "crypto");
+const lastLive = {};
+
+function connectBinance(hostIndex) {
+  if (!cryptoItems.length) return;
+  const hosts = ["wss://stream.binance.com:9443", "wss://data-stream.binance.vision"];
+  const url = hosts[hostIndex] + "/stream?streams=" + cryptoItems.map(i => i.code.toLowerCase() + "@ticker").join("/");
+  let ws, retried = false;
+  const retry = () => { if (retried) return; retried = true; setTimeout(() => connectBinance((hostIndex + 1) % hosts.length), 3000); };
+  try { ws = new WebSocket(url); } catch (e) { return retry(); }
+  ws.onmessage = ev => {
+    try {
+      const d = JSON.parse(ev.data).data;
+      if (!d || !d.s) return;
+      const now = Date.now();
+      if (lastLive[d.s] && now - lastLive[d.s] < 1000) return;
+      lastLive[d.s] = now;
+      render(d.s, parseFloat(d.c), parseFloat(d.P));
+    } catch (e) {}
+  };
+  ws.onclose = retry;
+  ws.onerror = () => { try { ws.close(); } catch (e) {} retry(); };
+}
+
+async function loadCoinGecko() {
+  const stale = cryptoItems.filter(i => !lastLive[norm(i.code)] || Date.now() - lastLive[norm(i.code)] > 10000);
+  if (!stale.length) return;
+  try {
+    const ids = stale.map(i => i.gecko).join(",");
+    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=" + ids +
+                            "&vs_currencies=usd&include_24hr_change=true");
+    const data = await res.json();
+    stale.forEach(i => {
+      const d = data[i.gecko];
+      if (d && !render(i.code, d.usd, d.usd_24h_change)) showStatus(i.code, "no data");
+    });
+  } catch (e) {
+    stale.forEach(i => showStatus(i.code, "offline"));
+  }
+}
+
+/* ---------- Start ---------- */
+
+buildTicker();
+loadSheet();
+setInterval(loadSheet, SHEET_REFRESH_SECONDS * 1000);
+connectBinance(0);
+setTimeout(loadCoinGecko, 4000);          // if Binance hasn't delivered in 4 s, use backup
+setInterval(loadCoinGecko, 15000);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(setDuration);
+window.addEventListener("resize", setDuration);
+</script>
 </body>
 </html>
