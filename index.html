@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Market Ticker</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #131722;   /* matches TradingView dark theme; change if your slide is light */
+      overflow: hidden;      /* no scrollbars inside the slide */
+    }
+    .tradingview-widget-container { width: 100%; }
+  </style>
+</head>
+<body>
+
+<!--
+  HOW TO EDIT YOUR SYMBOLS
+  ------------------------
+  Each line below is one item on the ticker:
+      { "proName": "EXCHANGE:SYMBOL", "title": "Label shown on screen" }
+
+  Indian stocks:  NSE:RELIANCE   NSE:TCS   NSE:HDFCBANK   (or BSE:RELIANCE if NSE doesn't load)
+  Indian index:   NSE:NIFTY      BSE:SENSEX
+  Forex:          FX_IDC:USDINR  FX:EURUSD  FX:GBPUSD
+  Crypto:         BINANCE:BTCUSDT  BINANCE:ETHUSDT
+  Commodities:    TVC:GOLD       TVC:USOIL
+
+  Find the exact code for anything by searching it on tradingview.com —
+  the code is shown at the top of the chart (e.g. NSE:INFY).
+  Every line except the last one must end with a comma.
+-->
+
+<div class="tradingview-widget-container">
+  <div class="tradingview-widget-container__widget"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+  {
+    "symbols": [
+      { "proName": "NSE:NIFTY",       "title": "Nifty 50" },
+      { "proName": "BSE:SENSEX",      "title": "Sensex" },
+      { "proName": "NSE:RELIANCE",    "title": "Reliance" },
+      { "proName": "NSE:TCS",         "title": "TCS" },
+      { "proName": "NSE:HDFCBANK",    "title": "HDFC Bank" },
+      { "proName": "NSE:INFY",        "title": "Infosys" },
+      { "proName": "FX_IDC:USDINR",   "title": "USD/INR" },
+      { "proName": "FX:EURUSD",       "title": "EUR/USD" },
+      { "proName": "BINANCE:BTCUSDT", "title": "Bitcoin" },
+      { "proName": "BINANCE:ETHUSDT", "title": "Ethereum" }
+    ],
+    "showSymbolLogo": true,
+    "isTransparent": false,
+    "displayMode": "adaptive",
+    "colorTheme": "dark",
+    "locale": "en"
+  }
+  </script>
+</div>
+
+</body>
+</html>
