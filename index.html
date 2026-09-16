@@ -73,8 +73,8 @@ const ITEMS = [
   { label: "TCS",       source: "sheet",  code: "NSE:TCS",           prefix: "₹", decimals: 2 },
   { label: "HDFC Bank", source: "sheet",  code: "NSE:HDFCBANK",      prefix: "₹", decimals: 2 },
   { label: "Infosys",   source: "sheet",  code: "NSE:INFY",          prefix: "₹", decimals: 2 },
-  { label: "USD/INR",   source: "sheet",  code: "CURRENCY:USDINR",   prefix: "₹", decimals: 4 },
-  { label: "EUR/USD",   source: "sheet",  code: "CURRENCY:EURUSD",   prefix: "$", decimals: 4 },
+  { label: "USD/INR",   source: "fx",  code: "CURRENCY:USDINR",   prefix: "₹", decimals: 4 },
+  { label: "EUR/USD",   source: "fx",  code: "CURRENCY:EURUSD",   prefix: "$", decimals: 4 },
   { label: "Bitcoin",   source: "crypto", code: "BTCUSDT", gecko: "bitcoin",  prefix: "$", decimals: 2 },
   { label: "Ethereum",  source: "crypto", code: "ETHUSDT", gecko: "ethereum", prefix: "$", decimals: 2 }
 ];
@@ -279,6 +279,16 @@ async function loadCoinGecko() {
   }
 }
 
+async function loadFx() {
+  const fx = ITEMS.filter(i => i.source === "fx");
+  if (!fx.length) return;
+  let r = null;
+  try { r = (await (await fetch("https://api.coinbase.com/v2/exchange-rates?currency=USD")).json()).data.rates; }
+  catch (e) { try { r = (await (await fetch("https://open.er-api.com/v6/latest/USD")).json()).rates; } catch (e2) {} }
+  if (!r) return fx.forEach(i => showStatus(i.code, "offline"));
+  const rate = { "CURRENCY:USDINR": +r.INR, "CURRENCY:EURUSD": 1 / +r.EUR };
+  fx.forEach(i => render(i.code, rate[i.code], NaN));
+}
 /* ---------- Start ---------- */
 
 buildTicker();
@@ -289,6 +299,8 @@ setTimeout(loadCoinGecko, 4000);          // if Binance hasn't delivered in 4 s,
 setInterval(loadCoinGecko, 15000);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(setDuration);
 window.addEventListener("resize", setDuration);
+loadFx();
+setInterval(loadFx, 10000);
 </script>
 </body>
 </html>
