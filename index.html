@@ -74,7 +74,7 @@ const ITEMS = [
   { label: "HDFC Bank", source: "sheet",  code: "NSE:HDFCBANK",      prefix: "₹", decimals: 2 },
   { label: "Infosys",   source: "sheet",  code: "NSE:INFY",          prefix: "₹", decimals: 2 },
   { label: "USD/INR",   source: "fx",  code: "CURRENCY:USDINR",   prefix: "₹", decimals: 4 },
-  { label: "EUR/USD",   source: "fx",  code: "CURRENCY:EURUSD",   prefix: "$", decimals: 4 },
+  { label: "EUR/USD", source: "crypto", code: "EURUSDT", prefix: "$", decimals: 4 },
   { label: "Bitcoin",   source: "crypto", code: "BTCUSDT", gecko: "bitcoin",  prefix: "$", decimals: 2 },
   { label: "Ethereum",  source: "crypto", code: "ETHUSDT", gecko: "ethereum", prefix: "$", decimals: 2 }
 ];
@@ -284,7 +284,7 @@ async function loadFx() {
   if (!fx.length) return;
   let r = null;
   try { r = (await (await fetch("https://api.coinbase.com/v2/exchange-rates?currency=USD")).json()).data.rates; }
-  catch (e) { try { r = (await (await fetch("https://open.er-api.com/v6/latest/USD")).json()).rates; } catch (e2) {} }
+  catch (e) { try { r = (await (await fetch("https://api.coinbase.com/v2/exchange-rates?currency=USD&t=" + Date.now(), { cache: "no-store" })).json()).rates; } catch (e2) {} }
   if (!r) return fx.forEach(i => showStatus(i.code, "offline"));
   const rate = { "CURRENCY:USDINR": +r.INR, "CURRENCY:EURUSD": 1 / +r.EUR };
   fx.forEach(i => render(i.code, rate[i.code], NaN));
